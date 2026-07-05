@@ -1,0 +1,96 @@
+# IAM Policy Review — triggered on PRs that touch IAM policy files.
+#
+# This workflow:
+# 1. Detects policy file changes in the PR
+# 2. Assumes an AWS IAM role via OIDC (no long-lived access keys)
+# 3. Reads the changed policy file content
+# 4. Invokes the Lambda bridge with a "policy_review" payload
+# 5. The agent posts its recommendation as a PR comment
+#
+# Required setup:
+# - GitHub OIDC provider configured in AWS
+# - IAM role with trust policy for this repo and lambda:InvokeFunction permission
+# - Lambda function deployed with AGENTCORE_RUNTIME_ENDPOINT configured
+# - Repository variables: AWS_ROLE_ARN, LAMBDA_FUNCTION_NAME, AWS_REGION
+
+name: IAM Policy Review
+
+on:
+  pull_request:
+    paths:
+      - "**/iam-policy*.json"
+      - "**/iam_policy*.json"
+      - "**/policy*.json"
+      - "**/trust-policy*.json"
+    branches:
+      - main
+
+permissions:
+  id-token: write          # Required for OIDC
+  contents: read           # Read repo contents
+  pull-requests: write     # Post PR comments
+  issues: write            # Create issues if needed
+
+jobs:
+  review-iam-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for diff
+
+      - name: Get changed policy files
+        id: changed-files
+        run: |
+          # Find policy files changed in this PR
+          CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} \
+                    ${{ github.event.pull_request.head.sha }} \
+                    -- '**/*policy*.json' '**/*iam*.json' | head -1)
+          echo "policy_file=${CHANGED}" >> "$GITHUB_OUTPUT"
+
+          if [ -n "$CHANGED" ]; then
+            CONTENT=$(cat "$CHANGED")
+            # Write to a file to avoid shell escaping issues
+            echo "$CONTENT" > /tmp/proposed_policy.json
+            echo "has_policy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_policy=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure AWS credentials via OIDC
+        if: steps.changed-files.outputs.has_policy == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::263846838953:role/GitHubActionsDeployRole
+          aws-region: us-east-1
+
+      - name: Invoke Policy Review Agent
+        if: steps.changed-files.outputs.has_policy == 'true'
+        run: |
+          PROPOSED_POLICY=$(cat /tmp/proposed_policy.json | jq -c .)
+
+          PAYLOAD=$(jq -n \
+            --arg task_type "policy_review" \
+            --arg repo "${{ github.repository }}" \
+            --argjson pr_number ${{ github.event.pull_request.number }} \
+            --arg github_token "${{ github.token }}" \
+            --arg proposed_policy "$PROPOSED_POLICY" \
+            --arg policy_file "${{ steps.changed-files.outputs.policy_file }}" \
+            '{
+              task_type: $task_type,
+              repo: $repo,
+              pr_number: $pr_number,
+              github_token: $github_token,
+              proposed_policy: $proposed_policy,
+              policy_file: $policy_file
+            }')
+
+          aws lambda invoke \
+            --function-name "${{ vars.LAMBDA_FUNCTION_NAME }}" \
+            --payload "$PAYLOAD" \
+            --cli-binary-format raw-in-base64-out \
+            /tmp/response.json
+
+          echo "Agent response:"
+          cat /tmp/response.json | jq .

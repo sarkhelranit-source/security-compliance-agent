@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment Variables
+.env
+.env.local
+
+# pytest
+.pytest_cache/
+
+# AgentCore CLI
+.agentcore/
+agentcore.json
+agentcore.yaml
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# AgentCore Deployment Caches
+agentcore/.cli/
+agentcore/cdk.out/
+agentcore/.env.local
+agentcore/.llm-context/
