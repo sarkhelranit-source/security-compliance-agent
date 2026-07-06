@@ -89,6 +89,14 @@ async def invoke(payload: dict[str, Any]) -> dict[str, Any]:
     Returns:
         A dict with the agent's response text and metadata.
     """
+    if "inputText" in payload:
+        try:
+            user_input = json.loads(payload["inputText"])
+            if isinstance(user_input, dict):
+                payload.update(user_input)
+        except Exception:
+            pass
+
     task_type = payload.get("task_type", "unknown")
     logger.info("Received invocation: task_type=%s", task_type)
 
