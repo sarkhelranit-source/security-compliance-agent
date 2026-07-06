@@ -89,6 +89,14 @@ async def invoke(payload: dict[str, Any]) -> dict[str, Any]:
     Returns:
         A dict with the agent's response text and metadata.
     """
+    if "prompt" in payload:
+        try:
+            user_input = json.loads(payload["prompt"])
+            if isinstance(user_input, dict):
+                payload.update(user_input)
+        except Exception:
+            pass
+
     if "inputText" in payload:
         try:
             user_input = json.loads(payload["inputText"])
@@ -120,9 +128,14 @@ async def invoke(payload: dict[str, Any]) -> dict[str, Any]:
     ):
         # Collect the final agent response
         if event.is_final_response():
-            for part in event.content.parts:
-                if part.text:
-                    response_text += part.text
+            if event.content and event.content.parts:
+                for part in event.content.parts:
+                    if part.text:
+                        response_text += part.text
+            elif hasattr(event, "error") and event.error:
+                response_text += f"Error executing agent: {event.error}"
+            else:
+                response_text += "Agent execution finished, but no output was provided."
 
     logger.info("Invocation complete: task_type=%s", task_type)
 

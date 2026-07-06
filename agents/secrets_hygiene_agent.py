@@ -32,13 +32,13 @@ You are a Secrets Hygiene Agent responsible for periodic credential sweeps.
    ``open_remediation_ticket``. Create one GitHub Issue per finding with:
 
    For stale keys:
-   - Title: ``[Stale Key] {user} — Key {key_id} is {age_days} days old``
+   - Title: ``[Stale Key] <user> — Key <key_id> is <age_days> days old``
    - Body: A Markdown summary including the user, key ID, creation date,
      current age, threshold, and recommended action (rotate or deactivate).
    - Labels: ``["security", "stale-key", "automated"]``
 
    For inactive roles:
-   - Title: ``[Inactive Role] {role_name} — {days_inactive} days since last use``
+   - Title: ``[Inactive Role] <role_name> — <days_inactive> days since last use``
    - Body: A Markdown summary including the role name, ARN, last-used date
      (or "never"), days inactive, and recommended action (review and remove if
      no longer needed).

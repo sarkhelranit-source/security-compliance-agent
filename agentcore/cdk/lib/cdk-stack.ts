@@ -113,6 +113,23 @@ export class AgentCoreStack extends Stack {
     }
     this.application = new AgentCoreApplication(this, 'Application', appProps as any);
 
+    // Grant required IAM permissions to all agent runtimes
+    for (const env of this.application.environments.values()) {
+      env.runtime.role.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          actions: [
+            'iam:ListUsers',
+            'iam:ListAccessKeys',
+            'iam:ListRoles',
+            'iam:GetPolicy',
+            'iam:GetPolicyVersion',
+            'iam:SimulateCustomPolicy'
+          ],
+          resources: ['*'],
+        })
+      );
+    }
+
     // Create AgentCoreMcp if there are gateways configured
     if (mcpSpec?.agentCoreGateways && mcpSpec.agentCoreGateways.length > 0) {
       new AgentCoreMcp(this, 'Mcp', {
